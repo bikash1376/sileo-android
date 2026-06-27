@@ -2,6 +2,7 @@ package com.sileo.island
 
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +32,8 @@ data class ToastData(
     val actionLabel: String? = null,
     val durationMs: Long = 6000L,
     val loading: Boolean = false,
+    // When set (real notifications), shown in the badge instead of the variant glyph.
+    val appIcon: ImageBitmap? = null,
 )
 
 /**
@@ -63,6 +66,7 @@ object Sileo {
         actionLabel: String? = null,
         loading: Boolean = false,
         durationMs: Long = 6000L,
+        appIcon: ImageBitmap? = null,
     ): Long {
         val id = ids.incrementAndGet()
         show(
@@ -74,10 +78,15 @@ object Sileo {
                 actionLabel = actionLabel,
                 loading = loading,
                 durationMs = durationMs,
+                appIcon = appIcon,
             )
         )
         return id
     }
+
+    /** A real OS notification: shows the posting app's icon in the badge. */
+    fun notification(title: String, description: String?, icon: ImageBitmap?) =
+        fire(SileoVariant.INFO, title, description, appIcon = icon)
 
     fun success(title: String, description: String? = null) =
         fire(SileoVariant.SUCCESS, title, description)

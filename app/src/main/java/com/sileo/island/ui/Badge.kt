@@ -7,16 +7,22 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.layout.ContentScale
 import com.sileo.island.SileoVariant
 
 /**
@@ -24,7 +30,22 @@ import com.sileo.island.SileoVariant
  * 24px badge. For PROMISE/loading it renders a spinning arc instead of a glyph.
  */
 @Composable
-fun Badge(variant: SileoVariant, loading: Boolean, modifier: Modifier = Modifier) {
+fun Badge(
+    variant: SileoVariant,
+    loading: Boolean,
+    modifier: Modifier = Modifier,
+    appIcon: ImageBitmap? = null,
+) {
+    // Real notifications: show the posting app's icon instead of a glyph.
+    if (appIcon != null && !loading) {
+        Image(
+            bitmap = appIcon,
+            contentDescription = null,
+            modifier = modifier.clip(CircleShape).fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+        return
+    }
     // Always running but trivially cheap; only read in the loading branch.
     val spin by rememberInfiniteTransition(label = "spin").animateFloat(
         initialValue = 0f,

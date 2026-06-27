@@ -187,7 +187,7 @@ val headerW by animateFloatAsState(
                 horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
             ) {
                 Crossfade(targetState = data.variant to data.loading, label = "badge") { (v, l) ->
-                    Badge(variant = v, loading = l, modifier = Modifier.size(22.dp))
+                    Badge(variant = v, loading = l, modifier = Modifier.size(22.dp), appIcon = data.appIcon)
                 }
                 Text(
                     text = data.title,
