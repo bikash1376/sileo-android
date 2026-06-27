@@ -19,3 +19,6 @@ local.properties
 *.aab
 *.keystore
 !gradle/wrapper/gradle-wrapper.jar
+
+# Local reference material (not part of the app)
+ref/
