@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.PixelFormat
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
+import android.service.notification.NotificationListenerService.RankingMap
 import android.service.notification.StatusBarNotification
 import android.view.Gravity
 import android.view.WindowManager
@@ -100,9 +101,19 @@ class SileoNotificationListenerService : NotificationListenerService() {
         }
     }
 
-    override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        handledKeys.remove(sbn.key)
-        super.onNotificationRemoved(sbn)
+    override fun onNotificationRemoved(
+        sbn: StatusBarNotification?,
+        rankingMap: RankingMap?,
+        reason: Int,
+    ) {
+        // Crucial: when WE snooze a notification to hide its heads-up, the system
+        // fires this with REASON_SNOOZED and later re-posts it. If we forgot the key
+        // here, the re-post would re-show + re-snooze forever. Only forget on a real
+        // dismissal, so the snooze-return is de-duped and the loop can't happen.
+        if (sbn != null && reason != REASON_SNOOZED) {
+            handledKeys.remove(sbn.key)
+        }
+        super.onNotificationRemoved(sbn, rankingMap, reason)
     }
 
     private fun hasProgress(n: Notification): Boolean {
