@@ -10,9 +10,9 @@ Sileo is a React component (SVG morphing + spring physics). This project recreat
 that look **natively in Kotlin + Jetpack Compose**, and then takes it further:
 turning it into a real **notification island** that floats over any app.
 
-<video src="https://github.com/bikash1376/sileo-android/raw/main/app/public/demo.mp4" controls width="320"></video>
+<img src="app/public/demo.gif" width="280" alt="Sileo Android demo" />
 
-_(If the video doesn't play above, [watch it here](https://github.com/bikash1376/sileo-android/raw/main/app/public/demo.mp4).)_
+▶️ **[Watch the full demo (with audio)](https://github.com/bikash1376/sileo-android/raw/main/app/public/demo.mp4)**
 
 </div>
 
