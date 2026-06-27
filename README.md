@@ -1,106 +1,123 @@
+<div align="center">
+
 # Sileo · Android
 
-An Android port of [**Sileo**](https://github.com/hiaaryan/sileo) by Aaryan — the
-opinionated, physics-based "Dynamic Island"–style toast for React. This project
-recreates the look (gooey morphing pill + spring physics) natively in **Kotlin +
-Jetpack Compose**, with the longer-term goal of using it as a real notification
-overlay that replaces the system heads-up banner.
+An Android port of **[Sileo](https://sileo.aaryan.design)** — the opinionated,
+physics-based "Dynamic Island"–style toast by
+**[Aaryan](https://github.com/hiaaryan/sileo)**.
 
-Original web demo: https://sileo.aaryan.design/play · License: MIT (design ported with that in mind).
+Sileo is a React component (SVG morphing + spring physics). This project recreates
+that look **natively in Kotlin + Jetpack Compose**, and then takes it further:
+turning it into a real **notification island** that floats over any app.
 
----
+<video src="https://github.com/bikash1376/sileo-android/raw/main/app/public/demo.mp4" controls width="320"></video>
 
-## Status at a glance
+_(If the video doesn't play above, [watch it here](https://github.com/bikash1376/sileo-android/raw/main/app/public/demo.mp4).)_
 
-| Phase | What | State |
-|------|------|-------|
-| **1** | Visual demo — the Sileo island, fired by buttons | ✅ **Built & compiling** |
-| **2** | Wire to real notifications (read + overlay on top of all apps) | ⬜ Not started |
-| **3** | Polish, settings, device-cutout positioning, distribution | ⬜ Not started |
-
-> **Are we done?** Phase 1 (the look) is built and produces a debug APK. Phases 2–3
-> (the actual "replace your notifications" behaviour) are still ahead. See below.
+</div>
 
 ---
 
-## ✅ Done (Phase 1)
+## What it is
 
-- **Gradle project** with wrapper (Gradle 8.9, AGP 8.7.3, Kotlin 2.0.21, Compose BOM
-  2024.10.01). Builds from the command line — **no Android Studio required**.
-- **The gooey morph** (`ui/GooeyEffect.kt`) — reproduces Sileo's SVG filter
-  (`feGaussianBlur` → alpha-threshold `feColorMatrix`) using the platform
-  `RenderEffect` graph: blur → alpha ramp, so the pill and body **merge like liquid**.
-  Gated to Android 12+ (API 31); older devices fall back to a clean spring morph.
-- **The island** (`ui/SileoToast.kt`) — a header pill (badge + title) that springs
-  open into a body (description + optional action button). Content is measured so any
-  title/description length fits; heights are spring-animated.
-- **Spring physics** tuned to match framer-motion's `bounce: 0.25 / 0.6s`
-  (`spring(dampingRatio = 0.62, stiffness = 320)`).
-- **Variants** (`Sileo.kt`): success / error / warning / info / action / promise, with
-  the original OKLCH accent colors converted to sRGB, drawn glyphs, and a spinning
-  loader for the promise/loading state.
-- **Autopilot host** (`ui/SileoHost.kt`) — stacks toasts at top-center and runs each
-  one's appear → auto-expand → hold → collapse → exit timeline. Tap to expand/collapse.
-- **Demo screen** (`MainActivity.kt`) — the playground: chips that fire each variant.
+A black, rounded **pill** that springs open into a wider **body** and back, with the
+two shapes fused by a liquid "gooey" join — just like the original Sileo. It comes in
+the same variants: **success · error · warning · info · action · promise**.
 
-### File map
-```
-app/src/main/java/com/sileo/island/
-  Sileo.kt            # variants, ToastData, the sileo.success()/error()/… controller
-  MainActivity.kt     # demo "playground" screen
-  ui/
-    GooeyEffect.kt    # the blur + alpha-threshold RenderEffect (the "goo")
-    SileoToast.kt     # the morphing island (pill ⇄ body)
-    Badge.kt          # drawn variant glyphs + loading spinner
-    SileoHost.kt      # stacking + auto expand/collapse/dismiss lifecycle
-```
+There are two flavors, on two branches:
+
+| Branch | What it is |
+|--------|------------|
+| **`main`** | The **island component + a playground**. A standalone app with buttons that fire each variant so you can see/tune the look. No special permissions. |
+| **`listener`** | The **real notification island**. Reads your actual notifications and shows them as the island over any app, with a per-app picker. |
 
 ---
 
-## ⬜ Left to do
+## How it works
 
-### Phase 2 — make it a real notification island
-- **`NotificationListenerService`** to read incoming notifications (requires the user
-  to grant *Notification access* in Settings).
-- **Overlay window** via `WindowManager` + `SYSTEM_ALERT_WINDOW` ("Display over other
-  apps") to paint the island on top of every app, anchored near the camera cutout.
-- **Foreground service** to keep the listener/overlay alive under background limits.
-- Map a real `StatusBarNotification` (app icon, title, text, actions) → `ToastData`.
-- Optionally **suppress the original heads-up banner** so only the island shows.
+**The island (both branches).** The "goo" is reproduced with Android's
+[`RenderEffect`](https://developer.android.com/reference/android/graphics/RenderEffect):
+a **blur** chained with an **alpha-threshold color matrix** — the exact blur-then-snap
+trick the web version does with its SVG filter. Two rounded rectangles (a narrow pill
++ a wider body) are drawn into that layer, and the blur fuses them into a smooth
+concave neck. The open/close morph is a Compose **`spring`** tuned to match
+framer-motion's feel. The body is revealed with a custom `layout` so its measured
+height always matches what's drawn (no text clipping).
 
-### Phase 3 — polish & ship
-- Per-device **cutout positioning** (notch/punch-hole varies by phone).
-- Tap-through / expand-on-tap / swipe-to-dismiss on the overlay.
-- Settings: position, duration, which apps, light/dark.
-- Decide distribution (sideload APK vs Play Store — overlay + notification-listener
-  apps face stricter Play review).
-- Reduced-motion + pre-API-31 fallbacks verified on real hardware.
+**The notification island (`listener` branch).** On a normal (non-rooted) phone you
+**can't replace** Android's notification renderer — so, like DynamicSpot / Dynamic
+Island apps, Sileo:
 
-### Known limitations / honest caveats
-- On non-rooted Android you **cannot** truly replace the OS notification renderer.
-  The realistic model (same as DynamicSpot / Dynamic Island apps) is: **read** via the
-  listener, **draw your own island overlay** on top, optionally **hide the heads-up**.
-  Notifications still live in the shade. True system replacement needs root/custom ROM.
-- The goo effect needs **Android 12+**; below that it degrades to a plain spring morph.
-- Not yet visually verified on a device/emulator (next step).
+1. Uses a **`NotificationListenerService`** to read incoming notifications.
+2. Draws the island in a **`SYSTEM_ALERT_WINDOW`** overlay on top of everything.
+3. **Classifies** each notification into the right variant (progress → promise,
+   error → error, alarm/call/actions → action, message/email/social → info) and shows
+   the **posting app's icon**.
+4. **Suppresses the default heads-up** for your chosen apps (so it feels like Sileo
+   *instead of* the stock popup). The notification still lives in the shade.
+
+You pick **which apps** use Sileo; everything else stays stock Android.
+
+---
+
+## Tech
+
+Kotlin · Jetpack Compose · `RenderEffect` goo · Compose `spring` physics ·
+`NotificationListenerService` + overlay window. minSdk 26, targetSdk 36.
+Gooey effect needs Android 12+ (gracefully degrades below).
 
 ---
 
 ## Build & run
 
-Prereqs (already present on the dev machine): JDK 17, Android SDK at `D:\Android\Sdk`,
-build-tools 35.0.0, an emulator or a USB device (Android 12+ recommended).
+You don't strictly need Android Studio — the Gradle wrapper + Android SDK is enough.
 
 ```bash
-# Build the debug APK
-./gradlew :app:assembleDebug
-
-# Install to a running emulator / connected device
+# Build + install to a running emulator / connected device (Android 12+)
 ./gradlew :app:installDebug
-# (or)  adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 # Launch
 adb shell am start -n com.sileo.island/.MainActivity
 ```
 
-Then tap **Success / Error / Warning / Info / Action / Promise** to fire the island.
+Or open the folder in **Android Studio** and hit Run ▶.
+
+### Testing `main` (the playground)
+Tap the **Success / Error / Warning / Info / Action / Promise** buttons — each fires
+the island so you can see the morph.
+
+### Testing `listener` (real notifications)
+```bash
+git checkout listener
+./gradlew :app:installDebug
+```
+Then in the app:
+1. Grant **Notification access**.
+2. Grant **Display over other apps**.
+3. **Choose apps** — pick which apps should show as the island.
+4. Tap **Send a real test notification**, or trigger a real notification from a chosen
+   app. It pops as the island over whatever's on screen.
+
+> A physical Android 12+ device is best for the `listener` branch, so you can see it
+> react to your real messages, downloads, alarms, etc.
+
+---
+
+## Status & caveats
+
+- ✅ The island look, all variants, the promise resolve flow.
+- ✅ Real notifications → island overlay, per-app picker, app-icon badges, heads-up
+  suppression.
+- ⏳ **Action buttons aren't interactive yet** — the overlay is pass-through so it
+  never blocks your apps; firing a notification's actions needs a touchable island
+  (next up).
+- Heads-up suppression uses the snooze trick; a brief flash is possible on some OEMs.
+- Per-device camera-cutout positioning is approximate for now.
+
+---
+
+## Credits
+
+Design and concept: **[Sileo](https://sileo.aaryan.design)** by
+**[Aaryan](https://github.com/hiaaryan/sileo)** (MIT). This is an independent Android
+re-creation built for learning and personal use.
