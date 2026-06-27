@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Sileo-style pill centered in the adaptive-icon safe zone -->
+    <path
+        android:fillColor="#F2F2F2"
+        android:pathData="M34,46 h40 a13,13 0 0 1 13,13 v0 a13,13 0 0 1 -13,13 h-40 a13,13 0 0 1 -13,-13 v0 a13,13 0 0 1 13,-13 z" />
+    <path
+        android:fillColor="#34C759"
+        android:pathData="M42,59 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+</vector>

@@ -1,0 +1,21 @@
+# Android / Gradle
+.gradle/
+build/
+*/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Local config (machine-specific)
+local.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Build outputs
+*.apk
+*.aab
+*.keystore
+!gradle/wrapper/gradle-wrapper.jar
