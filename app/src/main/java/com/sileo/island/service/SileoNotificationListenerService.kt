@@ -22,7 +22,9 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.sileo.island.AppPrefs
 import com.sileo.island.Sileo
+import com.sileo.island.SileoVariant
 import com.sileo.island.ui.SileoOverlay
 
 /**
@@ -53,11 +55,22 @@ class SileoNotificationListenerService : NotificationListenerService() {
         super.onDestroy()
     }
 
+    // Keys we've already turned into an island, so progress updates / snooze-returns
+    // don't spam or loop.
+    private val handledKeys = HashSet<String>()
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val n = sbn.notification ?: return
-        // Skip noise: persistent/foreground-service notifications and group summaries.
-        if (n.flags and Notification.FLAG_ONGOING_EVENT != 0) return
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        // Only intercept apps the user opted in (our own test notification always
+        // passes); everything else keeps stock behavior.
+        if (sbn.packageName != packageName && !AppPrefs.isEnabled(this, sbn.packageName)) return
+        if (sbn.key in handledKeys) return // already shown (update / snooze return)
+
+        val progress = hasProgress(n)
+        val ongoing = n.flags and Notification.FLAG_ONGOING_EVENT != 0
+        // Skip foreground-service noise, but DO allow ongoing progress (downloads etc).
+        if (ongoing && !progress) return
 
         val extras = n.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim()
@@ -65,11 +78,55 @@ class SileoNotificationListenerService : NotificationListenerService() {
             ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT))?.toString()?.trim()
         if (title.isNullOrEmpty() && text.isNullOrEmpty()) return
 
+        val (variant, loading) = classify(n, progress)
+        val actionLabel = if (variant == SileoVariant.ACTION) {
+            n.actions?.firstOrNull()?.title?.toString()
+        } else null
+
+        handledKeys += sbn.key
         Sileo.notification(
             title = title ?: appLabel(sbn.packageName),
             description = text?.ifEmpty { null },
             icon = appIconBitmap(sbn.packageName),
+            variant = variant,
+            actionLabel = actionLabel,
+            loading = loading,
         )
+
+        // Suppress the system heads-up for chosen apps (one-shot transient notifs only;
+        // progress/ongoing ones are left alone so they keep updating in the shade).
+        if (!ongoing && !progress) {
+            runCatching { snoozeNotification(sbn.key, 1500L) }
+        }
+    }
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        handledKeys.remove(sbn.key)
+        super.onNotificationRemoved(sbn)
+    }
+
+    private fun hasProgress(n: Notification): Boolean {
+        val e = n.extras
+        return e.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false) ||
+            e.getInt(Notification.EXTRA_PROGRESS_MAX, 0) > 0
+    }
+
+    /** Map an OS notification to the Sileo variant that best fits it. */
+    private fun classify(n: Notification, progress: Boolean): Pair<SileoVariant, Boolean> {
+        if (progress) return SileoVariant.PROMISE to true
+        val hasActions = (n.actions?.size ?: 0) > 0
+        return when (n.category) {
+            Notification.CATEGORY_ERROR -> SileoVariant.ERROR to false
+            Notification.CATEGORY_CALL,
+            Notification.CATEGORY_ALARM,
+            Notification.CATEGORY_REMINDER,
+            Notification.CATEGORY_EVENT -> SileoVariant.ACTION to false
+            Notification.CATEGORY_MESSAGE,
+            Notification.CATEGORY_EMAIL,
+            Notification.CATEGORY_SOCIAL -> SileoVariant.INFO to false
+            Notification.CATEGORY_PROGRESS -> SileoVariant.PROMISE to true
+            else -> if (hasActions) SileoVariant.ACTION to false else SileoVariant.INFO to false
+        }
     }
 
     private fun appIconBitmap(pkg: String) = runCatching {

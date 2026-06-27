@@ -85,8 +85,14 @@ object Sileo {
     }
 
     /** A real OS notification: shows the posting app's icon in the badge. */
-    fun notification(title: String, description: String?, icon: ImageBitmap?) =
-        fire(SileoVariant.INFO, title, description, appIcon = icon)
+    fun notification(
+        title: String,
+        description: String?,
+        icon: ImageBitmap?,
+        variant: SileoVariant = SileoVariant.INFO,
+        actionLabel: String? = null,
+        loading: Boolean = false,
+    ) = fire(variant, title, description, actionLabel = actionLabel, loading = loading, appIcon = icon)
 
     fun success(title: String, description: String? = null) =
         fire(SileoVariant.SUCCESS, title, description)

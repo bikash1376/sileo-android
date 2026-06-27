@@ -59,25 +59,36 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         createTestChannel(this)
-        setContent { OnboardingScreen() }
+        setContent { App() }
+    }
+}
+
+@Composable
+private fun App() {
+    var route by remember { mutableStateOf("home") }
+    when (route) {
+        "apps" -> AppPickerScreen(onBack = { route = "home" })
+        else -> OnboardingScreen(onChooseApps = { route = "apps" })
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun OnboardingScreen() {
+private fun OnboardingScreen(onChooseApps: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var listenerOn by remember { mutableStateOf(isListenerEnabled(context)) }
     var overlayOn by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
+    var appCount by remember { mutableStateOf(AppPrefs.enabled(context).size) }
 
-    // Re-check permissions every time we return from a Settings screen.
+    // Re-check permissions/selection every time we return to this screen.
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
         val obs = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 listenerOn = isListenerEnabled(context)
                 overlayOn = Settings.canDrawOverlays(context)
+                appCount = AppPrefs.enabled(context).size
             }
         }
         lifecycleOwner.lifecycle.addObserver(obs)
@@ -132,11 +143,14 @@ private fun OnboardingScreen() {
                 },
             )
 
+            Spacer(Modifier.height(12.dp))
+            ChooseAppsRow(appCount = appCount, onClick = onChooseApps)
+
             Spacer(Modifier.height(28.dp))
-            val ready = listenerOn && overlayOn
+            val ready = listenerOn && overlayOn && appCount > 0
             Text(
-                if (ready) "Ready ✓  Fire a notification to see the island."
-                else "Grant both above, then test below.",
+                if (ready) "Ready ✓  Notifications from your $appCount app(s) show as islands."
+                else "Grant both permissions and pick at least one app.",
                 color = if (ready) Color(0xFF15803D) else Color(0xFF71717A),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
@@ -207,6 +221,38 @@ private fun PermissionRow(
         if (!granted) {
             Text("Grant", color = Color(0xFF0A84FF), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
+    }
+}
+
+@Composable
+private fun ChooseAppsRow(appCount: Int, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White)
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(28.dp)
+                .clip(RoundedCornerShape(50))
+                .background(if (appCount > 0) Color(0xFF34C759) else Color(0xFFE4E4E7)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(if (appCount > 0) "✓" else "3", color = if (appCount > 0) Color.White else Color(0xFF52525B), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.size(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Choose apps", color = Color(0xFF18181B), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                if (appCount > 0) "$appCount selected" else "None yet — pick apps to show as islands",
+                color = Color(0xFF71717A), fontSize = 12.5.sp,
+            )
+        }
+        Text("Edit", color = Color(0xFF0A84FF), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
