@@ -91,15 +91,49 @@ the island so you can see the morph.
 git checkout listener
 ./gradlew :app:installDebug
 ```
-Then in the app:
-1. Grant **Notification access**.
-2. Grant **Display over other apps**.
-3. **Choose apps** — pick which apps should show as the island.
-4. Tap **Send a real test notification**, or trigger a real notification from a chosen
-   app. It pops as the island over whatever's on screen.
 
-> A physical Android 12+ device is best for the `listener` branch, so you can see it
-> react to your real messages, downloads, alarms, etc.
+---
+
+## Set it up on your phone
+
+The `listener` branch is meant to run on a real phone (Android 12+). You can build and
+push it over USB, or just sideload the APK.
+
+**1. Get the app on the phone**
+```bash
+# Build the APK
+./gradlew :app:assembleDebug
+# …then install it over USB (-r reinstalls without the Play Protect dialog)
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+Or copy `app/build/outputs/apk/debug/app-debug.apk` to the phone and tap it.
+
+> **Play Protect warning?** This is an unsigned, sideloaded app that reads notifications
+> and draws overlays, so Play Protect may warn. It's a false positive — choose
+> *Install anyway* (or use `adb install -r`, which skips the dialog).
+
+**2. Grant permissions, in the app**
+1. **Notification access** — lets Sileo read incoming notifications.
+2. **Display over other apps** — lets it draw the island on top.
+3. **Choose apps** — pick which apps should show as the island.
+
+**3. Try it**
+Tap **Send a real test notification**, or trigger a notification from a chosen app — it
+pops as the island over whatever's on screen. Tap the **gooey body** to open the source
+app; tap the **pill** to collapse it; **swipe up** to dismiss.
+
+### Xiaomi / POCO / Redmi (MIUI / HyperOS)
+MIUI has extra gates beyond stock Android. If the island doesn't appear for real
+notifications, in **Settings → Apps → Sileo Island**, also enable:
+- **Display pop-up windows while running in the background** (the critical one)
+- **Autostart**
+- Battery saver → **No restrictions**
+
+Then toggle **Notification access** off and back on so the listener re-binds.
+
+> A physical Android 12+ device is best here, so you can see it react to your real
+> messages, downloads, alarms, etc. The gooey effect needs Android 12+ (it degrades
+> gracefully below).
 
 ---
 
@@ -108,11 +142,48 @@ Then in the app:
 - ✅ The island look, all variants, the promise resolve flow.
 - ✅ Real notifications → island overlay, per-app picker, app-icon badges, heads-up
   suppression.
-- ⏳ **Action buttons aren't interactive yet** — the overlay is pass-through so it
-  never blocks your apps; firing a notification's actions needs a touchable island
-  (next up).
+- ✅ **Interactive island** — the overlay is a touch-transparent wrap-content window, so
+  only the island catches taps (the rest of the screen still passes through). Tap the
+  body to open the source app; tap an action chip to fire its action.
+- ⚠️ **Inline reply isn't possible** from an overlay (it needs the system's notification
+  UI), so a Reply action opens the app instead of sending text in place.
 - Heads-up suppression uses the snooze trick; a brief flash is possible on some OEMs.
 - Per-device camera-cutout positioning is approximate for now.
+
+---
+
+## Privacy
+
+Sileo reads your notifications and draws over other apps — powerful access, so here's
+exactly what it does with it (this is also in-app, under **What about privacy?**):
+
+- **Nothing leaves your phone.** Sileo has **no internet permission** at all — no
+  servers, no analytics, no tracking. Your notifications can't be uploaded or shared.
+- **Nothing is stored.** No notification history is kept; the only saved data is the
+  short list of apps you picked, in private on-device storage.
+- **Your content is never logged.** Release builds never write notification titles or
+  text to the device log, so OTPs, messages and banking alerts stay private. (Diagnostic
+  logging exists only in debug builds, and even then it logs package/category — never
+  content.)
+- **It can't see your taps.** The overlay only redraws a notification you already
+  received; it can't read what you type or what's underneath it.
+- **You choose what's included.** Only the apps you pick become islands; everything else
+  stays stock Android.
+- `allowBackup` is disabled so the app's data isn't pulled into device backups.
+
+> **Note on replies & actions:** Sileo is *not* a full notification replacement. Reply
+> and action buttons don't work inline like the native notification — tapping one just
+> **opens the respective app** (an overlay can't host the system's inline reply UI).
+
+---
+
+## Open source & feedback
+
+Sileo is fully open source — read every line, fork it, or build it yourself.
+
+- **Source:** <https://github.com/bikash1376/sileo-android>
+- **Found a bug or have feedback?** Open an issue:
+  <https://github.com/bikash1376/sileo-android/issues/new>
 
 ---
 

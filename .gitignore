@@ -1,5 +1,6 @@
 # Android / Gradle
 .gradle/
+.kotlin/
 build/
 */build/
 captures/
@@ -22,3 +23,7 @@ local.properties
 
 # Local reference material (not part of the app)
 ref/
+
+# JVM crash logs
+hs_err_pid*.log
+replay_pid*.log
