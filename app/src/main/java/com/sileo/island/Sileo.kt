@@ -1,6 +1,9 @@
 package com.sileo.island
 
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import kotlinx.coroutines.CoroutineScope
@@ -34,6 +37,10 @@ data class ToastData(
     val loading: Boolean = false,
     // When set (real notifications), shown in the badge instead of the variant glyph.
     val appIcon: ImageBitmap? = null,
+    // Real-notification intents. contentIntent launches the source app on tap;
+    // actionIntent fires the first action button (e.g. "Done"). Null for in-app demos.
+    val contentIntent: android.app.PendingIntent? = null,
+    val actionIntent: android.app.PendingIntent? = null,
 )
 
 /**
@@ -44,6 +51,14 @@ object Sileo {
     private val ids = AtomicLong(0L)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val toasts = mutableStateListOf<ToastData>()
+
+    /**
+     * True while Sileo's own activity is visible. The system overlay hides its
+     * island then, so only the in-app host draws — otherwise both hosts render
+     * the same toast at the same spot and it looks doubled (one collapses on tap,
+     * the other keeps running its own timeline).
+     */
+    var appInForeground by mutableStateOf(false)
 
     fun show(data: ToastData) {
         toasts.add(data)
@@ -67,6 +82,8 @@ object Sileo {
         loading: Boolean = false,
         durationMs: Long = 6000L,
         appIcon: ImageBitmap? = null,
+        contentIntent: android.app.PendingIntent? = null,
+        actionIntent: android.app.PendingIntent? = null,
     ): Long {
         val id = ids.incrementAndGet()
         show(
@@ -79,6 +96,8 @@ object Sileo {
                 loading = loading,
                 durationMs = durationMs,
                 appIcon = appIcon,
+                contentIntent = contentIntent,
+                actionIntent = actionIntent,
             )
         )
         return id
@@ -92,7 +111,12 @@ object Sileo {
         variant: SileoVariant = SileoVariant.INFO,
         actionLabel: String? = null,
         loading: Boolean = false,
-    ) = fire(variant, title, description, actionLabel = actionLabel, loading = loading, appIcon = icon)
+        contentIntent: android.app.PendingIntent? = null,
+        actionIntent: android.app.PendingIntent? = null,
+    ) = fire(
+        variant, title, description, actionLabel = actionLabel, loading = loading,
+        appIcon = icon, contentIntent = contentIntent, actionIntent = actionIntent,
+    )
 
     fun success(title: String, description: String? = null) =
         fire(SileoVariant.SUCCESS, title, description)

@@ -9,6 +9,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -51,9 +52,13 @@ import com.sileo.island.ToastData
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-private val ISLAND = Color(0xFF1B1B1D)
-private val TITLE = Color(0xFFF4F4F5)
-private val SUBTLE = Color(0xFFAEAEB4)
+// Island surface + text, per theme. Fully opaque so the gooey silhouette is solid.
+private val ISLAND_DARK = Color(0xFF1B1B1D)
+private val TITLE_DARK = Color(0xFFF4F4F5)
+private val SUBTLE_DARK = Color(0xFFAEAEB4)
+private val ISLAND_LIGHT = Color(0xFFFFFFFF)
+private val TITLE_LIGHT = Color(0xFF09090B)
+private val SUBTLE_LIGHT = Color(0xFF52525B)
 
 // Slow, liquid spring so the gooey morph is actually visible (~0.9s).
 private fun <T> morphSpring() = spring<T>(dampingRatio = 0.72f, stiffness = 150f)
@@ -62,10 +67,16 @@ private fun <T> morphSpring() = spring<T>(dampingRatio = 0.72f, stiffness = 150f
 fun SileoToast(
     data: ToastData,
     expanded: Boolean,
-    onClick: () -> Unit,
+    onClick: () -> Unit,                 // tap the PILL: collapse / toggle the gooey body
     modifier: Modifier = Modifier,
+    onBodyClick: (() -> Unit)? = null,   // tap the GOOEY BODY: open the source app
+    onAction: (() -> Unit)? = null,      // tap the action chip: fire the action
 ) {
     val density = LocalDensity.current
+    val dark = isSystemInDarkTheme()
+    val island = if (dark) ISLAND_DARK else ISLAND_LIGHT
+    val titleColor = if (dark) TITLE_DARK else TITLE_LIGHT
+    val subtleColor = if (dark) SUBTLE_DARK else SUBTLE_LIGHT
     // val pillHeightDp = 48.dp
     val pillHeightDp = 52.dp
 
@@ -132,13 +143,32 @@ val headerW by animateFloatAsState(
     }
     val goo = gooeyRenderEffect(baseBlurPx + extraBlur.value)
 
-    Box(
-        modifier = modifier.clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null,
-            onClick = onClick,
-        ),
-    ) {
+    Box(modifier = modifier) {
+        // ---- SOLID BASE (bottom; fully opaque) ----
+        // The goo's blur+threshold leaves the fill semi-transparent on some GPUs, so
+        // the app behind showed through. This draws the SAME pill+body geometry with
+        // the SAME animated values (headerW, bodyVisPx) but no blur — guaranteeing a
+        // 100%-opaque island. The goo layer above just adds the merged gooey rim.
+        Canvas(Modifier.matchParentSize()) {
+            val cx = size.width / 2f
+            drawRoundRect(
+                color = island,
+                topLeft = Offset(cx - (headerW + blobPadding) / 2f, 0f),
+                size = Size(headerW + blobPadding, pillHeightPx),
+                cornerRadius = CornerRadius(pillHeightPx / 2f),
+            )
+            if (bodyVisPx > 1f) {
+                val top = pillHeightPx - overlapPx
+                val bodyWidth = bodyWPx.toFloat() + blobPadding
+                drawRoundRect(
+                    color = island,
+                    topLeft = Offset(cx - bodyWidth / 2f, top),
+                    size = Size(bodyWidth, bodyVisPx + overlapPx),
+                    cornerRadius = CornerRadius(bodyCornerPx),
+                )
+            }
+        }
+
         // ---- GOO LAYER (behind; matches the content's wrapped size) ----
         Box(
             Modifier
@@ -154,7 +184,7 @@ val headerW by animateFloatAsState(
                 //     cornerRadius = CornerRadius(pillHeightPx / 2f),
                 // )
                 drawRoundRect(
-                    color = ISLAND,
+                    color = island,
                     topLeft = Offset(cx - (headerW + blobPadding) / 2f, 0f),
                     size = Size(headerW + blobPadding, pillHeightPx),
                     cornerRadius = CornerRadius(pillHeightPx / 2f),
@@ -166,7 +196,7 @@ val headerW by animateFloatAsState(
                     // Two rounded rects + the gooey blur = real Sileo: a wide body below
                     // the narrow pill, with the blur forming the concave neck between them.
                     drawRoundRect(
-                        color = ISLAND,
+                        color = island,
                         topLeft = Offset(cx - bodyWidth / 2f, top),
                         size = Size(bodyWidth, bodyVisPx + overlapPx),
                         cornerRadius = CornerRadius(bodyCornerPx),
@@ -179,8 +209,15 @@ val headerW by animateFloatAsState(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Row(
                 modifier = Modifier
-                    .widthIn(min = 234.dp, max = 380.dp)
+                    // No fixed min: the pill hugs the title/app-name width (dynamic in
+                    // both the collapsed pill and when the gooey body is open).
+                    .widthIn(min = 0.dp, max = 380.dp)
                     .height(pillHeightDp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onClick, // pill tap → collapse / toggle
+                    )
                     .padding(horizontal = 40.dp)
                     .onSizeChanged { headerWPx = it.width },
                 verticalAlignment = Alignment.CenterVertically,
@@ -191,7 +228,7 @@ val headerW by animateFloatAsState(
                 }
                 Text(
                     text = data.title,
-                    color = TITLE,
+                    color = titleColor,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -207,6 +244,11 @@ val headerW by animateFloatAsState(
             Box(
                 Modifier
                     .clipToBounds()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onBodyClick ?: onClick, // body tap → open source app
+                    )
                     .layout { measurable, constraints ->
                         val p = measurable.measure(constraints)
                         // Capture the full size from the SAME placeable we draw, so the
@@ -233,7 +275,7 @@ val headerW by animateFloatAsState(
                     data.description?.let {
                         Text(
                             text = it,
-                            color = SUBTLE,
+                            color = subtleColor,
                             fontSize = 13.5.sp,
                             lineHeight = 18.sp,
                         )
@@ -242,7 +284,7 @@ val headerW by animateFloatAsState(
                         Spacer(Modifier.height(10.dp))
                         Box(
                             Modifier
-                                .clickable(onClick = onClick)
+                                .clickable(onClick = onAction ?: onClick)
                                 .background(
                                     color = data.variant.accent.copy(alpha = 0.18f),
                                     shape = RoundedCornerShape(50),

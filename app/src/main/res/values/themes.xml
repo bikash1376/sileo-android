@@ -5,4 +5,10 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="o_mr1">shortEdges</item>
     </style>
+
+    <!-- Shown as the window background while the activity loads; swapped to the
+         normal theme in MainActivity.onCreate(). -->
+    <style name="Theme.SileoIsland.Splash" parent="Theme.SileoIsland">
+        <item name="android:windowBackground">@drawable/splash_screen</item>
+    </style>
 </resources>

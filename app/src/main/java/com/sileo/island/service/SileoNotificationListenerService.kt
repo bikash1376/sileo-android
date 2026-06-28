@@ -24,6 +24,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.sileo.island.AppPrefs
+import com.sileo.island.BuildConfig
 import com.sileo.island.Sileo
 import com.sileo.island.SileoVariant
 import com.sileo.island.ui.SileoOverlay
@@ -61,23 +62,48 @@ class SileoNotificationListenerService : NotificationListenerService() {
     private val handledKeys = HashSet<String>()
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        // Self-heal: if overlay permission was granted *after* the listener connected,
+        // onListenerConnected()'s addOverlay() already bailed. Retry here (idempotent)
+        // so the window comes up as soon as any notification arrives.
+        addOverlay()
+
         val n = sbn.notification ?: return
-        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        // Diagnostic logging is DEBUG-only and never includes notification content
+        // (titles/text can hold OTPs, messages, banking alerts). Capture in a debug
+        // build with:  adb logcat -s SileoListener
+        dbg(
+            "posted pkg=${sbn.packageName} cat=${n.category} flags=0x${n.flags.toString(16)} " +
+                "ongoing=${n.flags and Notification.FLAG_ONGOING_EVENT != 0} enabled=${AppPrefs.isEnabled(this, sbn.packageName)}",
+        )
+        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) {
+            dbg("  drop: group summary")
+            return
+        }
         // Only intercept apps the user opted in (our own test notification always
         // passes); everything else keeps stock behavior.
-        if (sbn.packageName != packageName && !AppPrefs.isEnabled(this, sbn.packageName)) return
+        if (sbn.packageName != packageName && !AppPrefs.isEnabled(this, sbn.packageName)) {
+            dbg("  drop: package not enabled in picker")
+            return
+        }
         if (sbn.key in handledKeys) return // already shown (update / snooze return)
 
         val progress = hasProgress(n)
         val ongoing = n.flags and Notification.FLAG_ONGOING_EVENT != 0
         // Skip foreground-service noise, but DO allow ongoing progress (downloads etc).
-        if (ongoing && !progress) return
+        if (ongoing && !progress) {
+            dbg("  drop: ongoing & not progress (alarm/fgs)")
+            return
+        }
 
         val extras = n.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim()
         val text = (extras.getCharSequence(Notification.EXTRA_TEXT)
             ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT))?.toString()?.trim()
-        if (title.isNullOrEmpty() && text.isNullOrEmpty()) return
+        if (title.isNullOrEmpty() && text.isNullOrEmpty()) {
+            dbg("  drop: empty title & text")
+            return
+        }
+        dbg("  -> showing island") // no title: never log notification content
 
         val (variant, loading) = classify(n, progress)
         val actionLabel = if (variant == SileoVariant.ACTION) {
@@ -92,6 +118,9 @@ class SileoNotificationListenerService : NotificationListenerService() {
             variant = variant,
             actionLabel = actionLabel,
             loading = loading,
+            // Tap launches the app; the action chip fires the first action button.
+            contentIntent = n.contentIntent,
+            actionIntent = n.actions?.firstOrNull()?.actionIntent,
         )
 
         // Suppress the system heads-up for chosen apps (one-shot transient notifs only;
@@ -114,6 +143,11 @@ class SileoNotificationListenerService : NotificationListenerService() {
             handledKeys.remove(sbn.key)
         }
         super.onNotificationRemoved(sbn, rankingMap, reason)
+    }
+
+    /** DEBUG-only logger. No-ops in release so nothing about notifications ships. */
+    private fun dbg(msg: String) {
+        if (BuildConfig.DEBUG) android.util.Log.d("SileoListener", msg)
     }
 
     private fun hasProgress(n: Notification): Boolean {
@@ -165,16 +199,25 @@ class SileoNotificationListenerService : NotificationListenerService() {
         overlayView = view
 
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
+            // WRAP_CONTENT so the window hugs the island at top-center: it's touchable
+            // (so taps/swipes reach the island) but covers nothing else, so the rest of
+            // the screen still passes through to the app underneath. When no island is
+            // showing the content is ~empty, so the window shrinks to nothing.
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            // Pass-through: never steals touches from the app underneath.
+            // NOT_FOCUSABLE: don't steal the keyboard / back button. We intentionally do
+            // NOT set NOT_TOUCHABLE anymore, so the island can receive taps.
+            // FLAG_HARDWARE_ACCELERATED is required for the RenderEffect goo to draw:
+            // windows added directly via WindowManager are NOT HW-accelerated by default
+            // (unlike Activity windows), so without it the gooey layer renders blank on
+            // real devices even though it works on some emulators.
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT,
-        ).apply { gravity = Gravity.TOP }
+        ).apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL }
 
         runCatching { wm.addView(view, params) }
     }

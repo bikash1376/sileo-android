@@ -30,14 +30,17 @@ fun gooeyRenderEffect(blurPx: Float): ComposeRenderEffect? {
 
     val blur = RenderEffect.createBlurEffect(blurPx, blurPx, Shader.TileMode.DECAL)
 
-    // Alpha ramp: A' = 18*A - 9  (in 0..1 terms). In Android's 0..255 colour
-    // space the bias must be scaled by 255 -> -9 * 255 ≈ -2295.
+    // Alpha ramp: A' = K*A - K*t  (threshold t, slope K). A much steeper slope
+    // than the original 18× snaps every interior pixel hard to opaque instead of
+    // leaving it semi-transparent (the island was showing ~60-70% through to the
+    // app behind). Threshold t≈0.46 keeps the merged silhouette from thinning.
+    // In Android's 0..255 space the bias is K*t*255 -> 42 * 0.46 * 255 ≈ -4925.
     val matrix = ColorMatrix(
         floatArrayOf(
             1f, 0f, 0f, 0f, 0f,
             0f, 1f, 0f, 0f, 0f,
             0f, 0f, 1f, 0f, 0f,
-            0f, 0f, 0f, 18f, -2295f,
+            0f, 0f, 0f, 42f, -4925f,
         )
     )
     val threshold = RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(matrix))

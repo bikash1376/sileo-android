@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launch splash: the Sileo. wordmark centered on the same near-black as the app icon. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/ic_launcher_background" />
+    <item
+        android:width="180dp"
+        android:height="77dp"
+        android:gravity="center"
+        android:drawable="@drawable/sileo_splash" />
+</layer-list>
