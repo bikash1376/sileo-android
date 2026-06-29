@@ -9,6 +9,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,6 +28,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.sileo.island.Sileo
+import com.sileo.island.SileoSettings
 import com.sileo.island.ToastData
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -45,9 +47,11 @@ fun SileoHost(modifier: Modifier = Modifier) {
     Box(
         // Sizing is supplied by the caller: fillMaxSize() for the in-app host (island
         // centered over full-screen UI), wrap for the overlay window (so it hugs the
-        // island and stays touch-transparent elsewhere). statusBarsPadding only (no
-        // extra top gap) keeps the island high up near the cutout, like a real island.
-        modifier = modifier.statusBarsPadding(),
+        // island and stays touch-transparent elsewhere). statusBarsPadding keeps it
+        // clear of the cutout; the user's vertical-offset setting nudges it up/down.
+        modifier = modifier
+            .statusBarsPadding()
+            .padding(top = SileoSettings.verticalOffsetDp.dp),
         contentAlignment = Alignment.TopCenter,
     ) {
         val toasts = Sileo.toasts
@@ -109,14 +113,16 @@ private fun ToastSlot(data: ToastData, front: Boolean = true) {
         Sileo.dismiss(data.id)
     }
 
-    // Auto timeline (bails if the user already dismissed it).
+    // Auto timeline (bails if the user already dismissed it). The reveal-speed setting
+    // scales the wait before the gooey body opens (faster setting → shorter delay).
     LaunchedEffect(data.id) {
+        val expandDelay = (AUTO_EXPAND_DELAY_MS / SileoSettings.gooeySpeed).toLong()
         visible = true
-        delay(AUTO_EXPAND_DELAY_MS)
+        delay(expandDelay)
         if (dismissed) return@LaunchedEffect
         expandedRaw = true
 
-        val hold = (data.durationMs - AUTO_EXPAND_DELAY_MS - COLLAPSE_SETTLE_MS).coerceAtLeast(1200L)
+        val hold = (data.durationMs - expandDelay - COLLAPSE_SETTLE_MS).coerceAtLeast(1200L)
         delay(hold)
         if (dismissed) return@LaunchedEffect
 

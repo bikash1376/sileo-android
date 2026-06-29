@@ -51,6 +51,8 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.sileo.island.service.SileoNotificationListenerService
+import com.sileo.island.ui.SettingsScreen
+import com.sileo.island.ui.appColors
 
 private const val TEST_CHANNEL = "sileo_test"
 
@@ -65,6 +67,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         createTestChannel(this)
+        SileoSettings.load(this)
         setContent { App() }
     }
 
@@ -97,10 +100,12 @@ private fun App() {
                 "apps" -> AppPickerScreen(onBack = { route = "home" })
                 "privacy" -> PrivacyScreen(onBack = { route = "home" })
                 "setup" -> SetupScreen(onBack = { route = "home" })
+                "settings" -> SettingsScreen(onBack = { route = "home" })
                 else -> OnboardingScreen(
                     onChooseApps = { route = "apps" },
                     onPrivacy = { route = "privacy" },
                     onSetup = { route = "setup" },
+                    onSettings = { route = "settings" },
                 )
             }
         }
@@ -118,9 +123,11 @@ private fun OnboardingScreen(
     onChooseApps: () -> Unit,
     onPrivacy: () -> Unit,
     onSetup: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val c = appColors()
 
     var listenerOn by remember { mutableStateOf(isListenerEnabled(context)) }
     var overlayOn by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
@@ -146,7 +153,7 @@ private fun OnboardingScreen(
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color(0xFFF4F4F5)),
+            .background(c.pageBg),
     ) {
         Column(
             Modifier
@@ -155,10 +162,10 @@ private fun OnboardingScreen(
                 .padding(24.dp)
                 .padding(top = 32.dp),
         ) {
-            Text("Sileo · Android", color = Color(0xFF18181B), fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Text("Sileo · Android", color = c.textPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
             Text(
                 "Turn your notifications into the island.",
-                color = Color(0xFF71717A), fontSize = 14.sp,
+                color = c.textSecondary, fontSize = 14.sp,
                 modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
             )
             Spacer(Modifier.height(16.dp))
@@ -168,6 +175,7 @@ private fun OnboardingScreen(
             ) {
                 PillButton("🔒  What about privacy?", accent = true, onClick = onPrivacy)
                 PillButton("📖  How to set it up", onClick = onSetup)
+                PillButton("🎨  Customize the island", onClick = onSettings)
             }
             Spacer(Modifier.height(20.dp))
 
@@ -204,7 +212,7 @@ private fun OnboardingScreen(
             Text(
                 if (ready) "Ready ✓  Notifications from your $appCount app(s) show as islands."
                 else "Grant both permissions and pick at least one app.",
-                color = if (ready) Color(0xFF15803D) else Color(0xFF71717A),
+                color = if (ready) c.successText else c.textSecondary,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
             )
@@ -223,7 +231,7 @@ private fun OnboardingScreen(
             }
 
             Spacer(Modifier.height(24.dp))
-            Text("Quick look (renders here in-app):", color = Color(0xFF71717A), fontSize = 13.sp)
+            Text("Quick look (renders here in-app):", color = c.textSecondary, fontSize = 13.sp)
             Spacer(Modifier.height(10.dp))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -238,11 +246,11 @@ private fun OnboardingScreen(
             }
 
             Spacer(Modifier.height(36.dp))
-            Text("Open source", color = Color(0xFF18181B), fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            Text("Open source", color = c.textPrimary, fontSize = 30.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(
                 "Sileo is fully open — read every line, build it yourself, see that it sends nothing.",
-                color = Color(0xFF71717A), fontSize = 13.5.sp, lineHeight = 19.sp,
+                color = c.textSecondary, fontSize = 13.5.sp, lineHeight = 19.sp,
             )
             Spacer(Modifier.height(12.dp))
             LinkText("View the code on GitHub  ↗") { openUrl(context, REPO_URL) }
@@ -256,10 +264,11 @@ private fun OnboardingScreen(
 @Composable
 private fun PrivacyScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val c = appColors()
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color(0xFFF4F4F5)),
+            .background(c.pageBg),
     ) {
         Column(
             Modifier
@@ -268,21 +277,14 @@ private fun PrivacyScreen(onBack: () -> Unit) {
                 .padding(24.dp)
                 .padding(top = 32.dp),
         ) {
-            Text(
-                "‹ Back",
-                color = Color(0xFF0A84FF), fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable(onClick = onBack)
-                    .padding(vertical = 6.dp, horizontal = 2.dp),
-            )
+            BackLink(onBack)
             Spacer(Modifier.height(16.dp))
-            Text("What about privacy?", color = Color(0xFF18181B), fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text("What about privacy?", color = c.textPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
             Text(
                 "Sileo can read your notifications and draw over other apps. That's powerful, " +
                     "so here's exactly what it does — and doesn't — do with that access.",
-                color = Color(0xFF52525B), fontSize = 14.sp, lineHeight = 20.sp,
+                color = c.textBody, fontSize = 14.sp, lineHeight = 20.sp,
             )
             Spacer(Modifier.height(20.dp))
 
@@ -325,17 +327,17 @@ private fun PrivacyScreen(onBack: () -> Unit) {
             Text(
                 "In short: Sileo reads notifications only to redraw them as the island — on your phone, " +
                     "for the apps you chose — and that information never goes anywhere else.",
-                color = Color(0xFF71717A), fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium,
+                color = c.textSecondary, fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium,
             )
 
             Spacer(Modifier.height(28.dp))
-            Text("About", color = Color(0xFF18181B), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("About", color = c.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
             Text(
                 "Sileo for Android is built on top of Sileo — the original physics-based \"Dynamic " +
                     "Island\" toast for the web by Aaryan. This is an independent native re-creation in " +
                     "Kotlin + Jetpack Compose, turned into a real notification island.",
-                color = Color(0xFF52525B), fontSize = 13.5.sp, lineHeight = 19.sp,
+                color = c.textBody, fontSize = 13.5.sp, lineHeight = 19.sp,
             )
             Spacer(Modifier.height(12.dp))
             LinkText("The original Sileo (web) by Aaryan  ↗") { openUrl(context, SILEO_WEB_URL) }
@@ -350,24 +352,26 @@ private fun PrivacyScreen(onBack: () -> Unit) {
 
 @Composable
 private fun PrivacyPoint(title: String, body: String) {
+    val c = appColors()
     Column(
         Modifier
             .fillMaxWidth()
             .padding(bottom = 16.dp),
     ) {
-        Text(title, color = Color(0xFF18181B), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text(title, color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(3.dp))
-        Text(body, color = Color(0xFF52525B), fontSize = 13.5.sp, lineHeight = 19.sp)
+        Text(body, color = c.textBody, fontSize = 13.5.sp, lineHeight = 19.sp)
     }
 }
 
 @Composable
 private fun SetupScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val c = appColors()
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color(0xFFF4F4F5)),
+            .background(c.pageBg),
     ) {
         Column(
             Modifier
@@ -378,11 +382,11 @@ private fun SetupScreen(onBack: () -> Unit) {
         ) {
             BackLink(onBack)
             Spacer(Modifier.height(16.dp))
-            Text("How to set it up", color = Color(0xFF18181B), fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text("How to set it up", color = c.textPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
             Text(
                 "Three quick steps to turn your notifications into the island.",
-                color = Color(0xFF52525B), fontSize = 14.sp, lineHeight = 20.sp,
+                color = c.textBody, fontSize = 14.sp, lineHeight = 20.sp,
             )
             Spacer(Modifier.height(20.dp))
 
@@ -400,30 +404,30 @@ private fun SetupScreen(onBack: () -> Unit) {
             )
 
             Spacer(Modifier.height(8.dp))
-            Text("On Xiaomi / POCO / Redmi (MIUI / HyperOS)", color = Color(0xFF18181B), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text("On Xiaomi / POCO / Redmi (MIUI / HyperOS)", color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
                 "MIUI needs a couple more toggles. In Settings → Apps → Sileo Island, also turn on " +
                     "\"Display pop-up windows while running in the background\" and \"Autostart\", and set " +
                     "battery to No restrictions. Then toggle Notification access off and back on.",
-                color = Color(0xFF52525B), fontSize = 13.5.sp, lineHeight = 19.sp,
+                color = c.textBody, fontSize = 13.5.sp, lineHeight = 19.sp,
             )
 
             Spacer(Modifier.height(18.dp))
-            Text("Using it", color = Color(0xFF18181B), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text("Using it", color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
                 "Tap the gooey body to open the app it came from. Tap the pill to collapse it. Swipe up to dismiss.",
-                color = Color(0xFF52525B), fontSize = 13.5.sp, lineHeight = 19.sp,
+                color = c.textBody, fontSize = 13.5.sp, lineHeight = 19.sp,
             )
 
             Spacer(Modifier.height(18.dp))
-            Text("Heads up: replies & actions", color = Color(0xFF18181B), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text("Heads up: replies & actions", color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
                 "Sileo isn't a full notification replacement. Reply and action buttons don't work inline like " +
                     "native notifications — tapping one just opens the respective app.",
-                color = Color(0xFF52525B), fontSize = 13.5.sp, lineHeight = 19.sp,
+                color = c.textBody, fontSize = 13.5.sp, lineHeight = 19.sp,
             )
 
             Spacer(Modifier.height(18.dp))
@@ -435,6 +439,7 @@ private fun SetupScreen(onBack: () -> Unit) {
 
 @Composable
 private fun SetupStep(num: String, title: String, body: String) {
+    val c = appColors()
     Row(
         Modifier
             .fillMaxWidth()
@@ -444,32 +449,33 @@ private fun SetupStep(num: String, title: String, body: String) {
             Modifier
                 .size(26.dp)
                 .clip(RoundedCornerShape(50))
-                .background(Color(0xFF18181B)),
+                .background(c.filledBg),
             contentAlignment = Alignment.Center,
         ) {
-            Text(num, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text(num, color = c.filledOn, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.size(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color(0xFF18181B), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(title, color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(2.dp))
-            Text(body, color = Color(0xFF52525B), fontSize = 13.sp, lineHeight = 18.sp)
+            Text(body, color = c.textBody, fontSize = 13.sp, lineHeight = 18.sp)
         }
     }
 }
 
 @Composable
 private fun PillButton(label: String, accent: Boolean = false, onClick: () -> Unit) {
+    val c = appColors()
     Box(
         Modifier
             .clip(RoundedCornerShape(50))
-            .background(if (accent) Color(0xFF0A84FF) else Color.White)
+            .background(if (accent) c.accent else c.surface)
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 11.dp),
     ) {
         Text(
             label,
-            color = if (accent) Color.White else Color(0xFF27272A),
+            color = if (accent) Color.White else c.textPrimary,
             fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
         )
     }
@@ -477,9 +483,10 @@ private fun PillButton(label: String, accent: Boolean = false, onClick: () -> Un
 
 @Composable
 private fun LinkText(label: String, onClick: () -> Unit) {
+    val c = appColors()
     Text(
         label,
-        color = Color(0xFF0A84FF), fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold,
+        color = c.accent, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold,
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
@@ -489,9 +496,10 @@ private fun LinkText(label: String, onClick: () -> Unit) {
 
 @Composable
 private fun BackLink(onBack: () -> Unit) {
+    val c = appColors()
     Text(
         "‹ Back",
-        color = Color(0xFF0A84FF), fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+        color = c.accent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onBack)
@@ -507,11 +515,12 @@ private fun PermissionRow(
     granted: Boolean,
     onClick: () -> Unit,
 ) {
+    val c = appColors()
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Color.White)
+            .background(c.surface)
             .clickable(enabled = !granted, onClick = onClick)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -520,29 +529,30 @@ private fun PermissionRow(
             Modifier
                 .size(28.dp)
                 .clip(RoundedCornerShape(50))
-                .background(if (granted) Color(0xFF34C759) else Color(0xFFE4E4E7)),
+                .background(if (granted) c.success else c.track),
             contentAlignment = Alignment.Center,
         ) {
-            Text(if (granted) "✓" else step, color = if (granted) Color.White else Color(0xFF52525B), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(if (granted) "✓" else step, color = if (granted) Color.White else c.textBody, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.size(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color(0xFF18181B), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Text(desc, color = Color(0xFF71717A), fontSize = 12.5.sp)
+            Text(title, color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(desc, color = c.textSecondary, fontSize = 12.5.sp)
         }
         if (!granted) {
-            Text("Grant", color = Color(0xFF0A84FF), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text("Grant", color = c.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
 
 @Composable
 private fun ChooseAppsRow(appCount: Int, onClick: () -> Unit) {
+    val c = appColors()
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Color.White)
+            .background(c.surface)
             .clickable(onClick = onClick)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -551,48 +561,50 @@ private fun ChooseAppsRow(appCount: Int, onClick: () -> Unit) {
             Modifier
                 .size(28.dp)
                 .clip(RoundedCornerShape(50))
-                .background(if (appCount > 0) Color(0xFF34C759) else Color(0xFFE4E4E7)),
+                .background(if (appCount > 0) c.success else c.track),
             contentAlignment = Alignment.Center,
         ) {
-            Text(if (appCount > 0) "✓" else "3", color = if (appCount > 0) Color.White else Color(0xFF52525B), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(if (appCount > 0) "✓" else "3", color = if (appCount > 0) Color.White else c.textBody, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.size(14.dp))
         Column(Modifier.weight(1f)) {
-            Text("Choose apps", color = Color(0xFF18181B), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text("Choose apps", color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             Text(
                 if (appCount > 0) "$appCount selected" else "None yet — pick apps to show as islands",
-                color = Color(0xFF71717A), fontSize = 12.5.sp,
+                color = c.textSecondary, fontSize = 12.5.sp,
             )
         }
-        Text("Edit", color = Color(0xFF0A84FF), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Text("Edit", color = c.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
 @Composable
 private fun FilledButton(label: String, onClick: () -> Unit) {
+    val c = appColors()
     Box(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(Color(0xFF18181B))
+            .background(c.filledBg)
             .clickable(onClick = onClick)
             .padding(vertical = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = c.filledOn, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
 @Composable
 private fun Chip(label: String, onClick: () -> Unit) {
+    val c = appColors()
     Box(
         Modifier
             .clip(RoundedCornerShape(50))
-            .background(Color.White)
+            .background(c.surface)
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 10.dp),
     ) {
-        Text(label, color = Color(0xFF27272A), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Text(label, color = c.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
     }
 }
 

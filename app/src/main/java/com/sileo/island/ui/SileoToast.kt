@@ -38,8 +38,10 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
@@ -48,20 +50,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sileo.island.SileoSettings
 import com.sileo.island.ToastData
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-// Island surface + text, per theme. Fully opaque so the gooey silhouette is solid.
-private val ISLAND_DARK = Color(0xFF1B1B1D)
-private val TITLE_DARK = Color(0xFFF4F4F5)
-private val SUBTLE_DARK = Color(0xFFAEAEB4)
-private val ISLAND_LIGHT = Color(0xFFFFFFFF)
-private val TITLE_LIGHT = Color(0xFF09090B)
-private val SUBTLE_LIGHT = Color(0xFF52525B)
-
-// Slow, liquid spring so the gooey morph is actually visible (~0.9s).
-private fun <T> morphSpring() = spring<T>(dampingRatio = 0.72f, stiffness = 150f)
+// Slow, liquid spring so the gooey morph is actually visible (~0.9s). [speed] scales
+// the stiffness so the user's reveal-speed setting changes how snappy the morph is.
+private fun <T> morphSpring(speed: Float = 1f) =
+    spring<T>(dampingRatio = 0.72f, stiffness = 150f * speed)
 
 @Composable
 fun SileoToast(
@@ -74,9 +71,12 @@ fun SileoToast(
 ) {
     val density = LocalDensity.current
     val dark = isSystemInDarkTheme()
-    val island = if (dark) ISLAND_DARK else ISLAND_LIGHT
-    val titleColor = if (dark) TITLE_DARK else TITLE_LIGHT
-    val subtleColor = if (dark) SUBTLE_DARK else SUBTLE_LIGHT
+    // Per-mode, user-customizable surface/text colors (defaults match the old look).
+    val theme = if (dark) SileoSettings.dark else SileoSettings.light
+    val titleColor = theme.title
+    val subtleColor = theme.subtitle
+    val fontFamily = SileoSettings.font.family
+    val speed = SileoSettings.gooeySpeed
     // val pillHeightDp = 48.dp
     val pillHeightDp = 52.dp
 
@@ -108,7 +108,7 @@ fun SileoToast(
     // height so the goo and the clip always agree — no measurement mismatch.
     val reveal by animateFloatAsState(
         targetValue = if (expanded && hasBody) 1f else 0f,
-        animationSpec = morphSpring(),
+        animationSpec = morphSpring(speed),
         label = "reveal",
     )
     val bodyAlpha by animateFloatAsState(
@@ -143,6 +143,14 @@ val headerW by animateFloatAsState(
     }
     val goo = gooeyRenderEffect(baseBlurPx + extraBlur.value)
 
+    // Surface fill: a vertical gradient when enabled, else a solid color. Must stay
+    // opaque or the goo's blur+threshold lets the app behind bleed through.
+    val islandBrush = if (theme.gradient) {
+        Brush.verticalGradient(listOf(theme.bg, theme.bgEnd))
+    } else {
+        SolidColor(theme.bg)
+    }
+
     Box(modifier = modifier) {
         // ---- SOLID BASE (bottom; fully opaque) ----
         // The goo's blur+threshold leaves the fill semi-transparent on some GPUs, so
@@ -152,7 +160,7 @@ val headerW by animateFloatAsState(
         Canvas(Modifier.matchParentSize()) {
             val cx = size.width / 2f
             drawRoundRect(
-                color = island,
+                brush = islandBrush,
                 topLeft = Offset(cx - (headerW + blobPadding) / 2f, 0f),
                 size = Size(headerW + blobPadding, pillHeightPx),
                 cornerRadius = CornerRadius(pillHeightPx / 2f),
@@ -161,7 +169,7 @@ val headerW by animateFloatAsState(
                 val top = pillHeightPx - overlapPx
                 val bodyWidth = bodyWPx.toFloat() + blobPadding
                 drawRoundRect(
-                    color = island,
+                    brush = islandBrush,
                     topLeft = Offset(cx - bodyWidth / 2f, top),
                     size = Size(bodyWidth, bodyVisPx + overlapPx),
                     cornerRadius = CornerRadius(bodyCornerPx),
@@ -184,7 +192,7 @@ val headerW by animateFloatAsState(
                 //     cornerRadius = CornerRadius(pillHeightPx / 2f),
                 // )
                 drawRoundRect(
-                    color = island,
+                    brush = islandBrush,
                     topLeft = Offset(cx - (headerW + blobPadding) / 2f, 0f),
                     size = Size(headerW + blobPadding, pillHeightPx),
                     cornerRadius = CornerRadius(pillHeightPx / 2f),
@@ -196,7 +204,7 @@ val headerW by animateFloatAsState(
                     // Two rounded rects + the gooey blur = real Sileo: a wide body below
                     // the narrow pill, with the blur forming the concave neck between them.
                     drawRoundRect(
-                        color = island,
+                        brush = islandBrush,
                         topLeft = Offset(cx - bodyWidth / 2f, top),
                         size = Size(bodyWidth, bodyVisPx + overlapPx),
                         cornerRadius = CornerRadius(bodyCornerPx),
@@ -229,6 +237,7 @@ val headerW by animateFloatAsState(
                 Text(
                     text = data.title,
                     color = titleColor,
+                    fontFamily = fontFamily,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -276,6 +285,7 @@ val headerW by animateFloatAsState(
                         Text(
                             text = it,
                             color = subtleColor,
+                            fontFamily = fontFamily,
                             fontSize = 13.5.sp,
                             lineHeight = 18.sp,
                         )
@@ -296,6 +306,7 @@ val headerW by animateFloatAsState(
                             Text(
                                 text = it,
                                 color = data.variant.accent,
+                                fontFamily = fontFamily,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                             )

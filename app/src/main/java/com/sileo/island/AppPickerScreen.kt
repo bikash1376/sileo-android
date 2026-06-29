@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
+import com.sileo.island.ui.appColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -49,6 +50,7 @@ private data class AppEntry(val pkg: String, val label: String, val icon: ImageB
 @Composable
 fun AppPickerScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val c = appColors()
 
     val appsState = produceState<List<AppEntry>?>(initialValue = null) {
         value = withContext(Dispatchers.IO) { loadLaunchableApps(context) }
@@ -65,7 +67,7 @@ fun AppPickerScreen(onBack: () -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(Color(0xFFF4F4F5))
+            .background(c.pageBg)
             .padding(top = 32.dp),
     ) {
         Row(
@@ -74,23 +76,23 @@ fun AppPickerScreen(onBack: () -> Unit) {
         ) {
             Text(
                 "‹ Back",
-                color = Color(0xFF0A84FF),
+                color = c.accent,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.clickable(onClick = onBack),
             )
             Spacer(Modifier.size(16.dp))
-            Text("Choose apps", color = Color(0xFF18181B), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Choose apps", color = c.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
         Text(
             "Notifications from selected apps show as the Sileo island (and skip the default popup). Others stay untouched.",
-            color = Color(0xFF71717A), fontSize = 13.sp,
+            color = c.textSecondary, fontSize = 13.sp,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
         )
 
         if (apps == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color(0xFF18181B))
+                CircularProgressIndicator(color = c.textPrimary)
             }
         } else {
             LazyColumn(Modifier.fillMaxSize().padding(top = 8.dp)) {
@@ -116,7 +118,7 @@ fun AppPickerScreen(onBack: () -> Unit) {
                         )
                         Text(
                             app.label,
-                            color = Color(0xFF18181B),
+                            color = c.textPrimary,
                             fontSize = 15.sp,
                             modifier = Modifier.weight(1f),
                         )

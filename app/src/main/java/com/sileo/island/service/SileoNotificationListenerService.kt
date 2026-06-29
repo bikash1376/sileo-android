@@ -44,6 +44,7 @@ class SileoNotificationListenerService : NotificationListenerService() {
 
     override fun onListenerConnected() {
         super.onListenerConnected()
+        com.sileo.island.SileoSettings.load(this)
         addOverlay()
     }
 

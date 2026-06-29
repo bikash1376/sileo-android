@@ -7,19 +7,32 @@ import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import com.sileo.island.R
 
-// Inter, bundled as a single variable TTF (res/font/inter.ttf). Each entry pins a
+// Each face is bundled as a single variable TTF (res/font/*.ttf). Each entry pins a
 // weight on the font's weight axis so SemiBold/Bold render as real weights, not faux.
 @OptIn(ExperimentalTextApi::class)
-private fun inter(weight: Int) = Font(
-    resId = R.font.inter,
+private fun variable(resId: Int, weight: Int) = Font(
+    resId = resId,
     weight = FontWeight(weight),
     variationSettings = FontVariation.Settings(FontVariation.weight(weight)),
 )
 
-/** App-UI typeface. Applied to the in-app screens only — the island keeps its own. */
-val InterFamily = FontFamily(
-    inter(400),
-    inter(500),
-    inter(600),
-    inter(700),
+private fun family(resId: Int) = FontFamily(
+    variable(resId, 400),
+    variable(resId, 500),
+    variable(resId, 600),
+    variable(resId, 700),
 )
+
+/** Inter — app-UI typeface and the default island face. */
+val InterFamily = family(R.font.inter)
+private val NunitoFamily = family(R.font.nunito)
+private val LoraFamily = family(R.font.lora)
+private val JetBrainsMonoFamily = family(R.font.jetbrains_mono)
+
+/** The user-selectable island typefaces, exposed in the settings screen. */
+enum class SileoFont(val label: String, val family: FontFamily) {
+    INTER("Inter", InterFamily),
+    NUNITO("Nunito", NunitoFamily),
+    LORA("Lora", LoraFamily),
+    JETBRAINS_MONO("JetBrains Mono", JetBrainsMonoFamily),
+}
