@@ -3,10 +3,11 @@ package com.sileo.island.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -141,10 +142,12 @@ private fun ToastSlot(data: ToastData, front: Boolean = true) {
             transformOrigin = TransformOrigin(0.5f, 0f),
             animationSpec = spring(dampingRatio = 0.6f, stiffness = 380f),
         ) + fadeIn(spring(stiffness = 600f)),
-        exit = scaleOut(
-            targetScale = 0.9f,
-            transformOrigin = TransformOrigin(0.5f, 0f),
-        ) + fadeOut(),
+        // Auto-dismiss (and tap/swipe) exit: slide straight up and fade out — the
+        // island leaves the way it came in, never sideways.
+        exit = slideOutVertically(
+            targetOffsetY = { fullHeight -> -fullHeight },
+            animationSpec = tween(EXIT_MS.toInt()),
+        ) + fadeOut(tween(EXIT_MS.toInt())),
     ) {
         SileoToast(
             data = data,

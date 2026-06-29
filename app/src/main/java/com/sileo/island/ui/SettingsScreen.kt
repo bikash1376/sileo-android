@@ -51,7 +51,7 @@ private val SWATCHES = listOf(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(onBack: (() -> Unit)? = null) {
     val context = LocalContext.current
     val c = appColors()
 
@@ -74,15 +74,17 @@ fun SettingsScreen(onBack: () -> Unit) {
                 .padding(24.dp)
                 .padding(top = 32.dp),
         ) {
-            Text(
-                "‹ Back",
-                color = c.accent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable(onClick = onBack)
-                    .padding(vertical = 6.dp, horizontal = 2.dp),
-            )
-            Spacer(Modifier.height(16.dp))
+            if (onBack != null) {
+                Text(
+                    "‹ Back",
+                    color = c.accent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onBack)
+                        .padding(vertical = 6.dp, horizontal = 2.dp),
+                )
+                Spacer(Modifier.height(16.dp))
+            }
             Text("Customize the island", color = c.textPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
             Text(

@@ -1,6 +1,6 @@
 package com.sileo.island.ui
 
-import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.sileo.island.Sileo
@@ -15,8 +15,8 @@ fun SileoOverlay() {
     // While Sileo's own activity is on screen, its in-app host draws the island;
     // suppress the overlay copy so the two don't stack into a doubled gooey.
     if (Sileo.appInForeground) return
-    // Wrap (not fillMaxSize) so the WRAP_CONTENT overlay window hugs the island and
-    // stays touch-transparent everywhere else. Vertical placement (clearing the
-    // cutout + the user's up/down nudge) is handled inside SileoHost via SileoSettings.
-    SileoHost(modifier = Modifier.wrapContentSize())
+    // Fill width (the overlay window is full-width, WRAP_CONTENT height) so the island
+    // centers itself and never drifts sideways. Vertical placement (clearing the cutout
+    // + the user's up/down nudge) is handled inside SileoHost via SileoSettings.
+    SileoHost(modifier = Modifier.fillMaxWidth())
 }

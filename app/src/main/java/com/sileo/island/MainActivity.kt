@@ -14,7 +14,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,9 +32,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -51,6 +59,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.sileo.island.service.SileoNotificationListenerService
+import com.sileo.island.ui.AppColors
 import com.sileo.island.ui.SettingsScreen
 import com.sileo.island.ui.appColors
 
@@ -84,9 +93,15 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private enum class Tab { HOME, SETTINGS, HELP }
+
 @Composable
 private fun App() {
-    var route by remember { mutableStateOf("home") }
+    var tab by remember { mutableStateOf(Tab.HOME) }
+    // The app picker is a sub-screen of Home (push/back), not one of the tabs.
+    var showApps by remember { mutableStateOf(false) }
+    val c = appColors()
+
     Box(Modifier.fillMaxSize()) {
         // Inter is the app-UI typeface (provided here so every screen's Text inherits
         // it). The island/notification is intentionally left out — it keeps its own.
@@ -96,17 +111,19 @@ private fun App() {
                     fontFamily = com.sileo.island.ui.InterFamily,
                 ),
         ) {
-            when (route) {
-                "apps" -> AppPickerScreen(onBack = { route = "home" })
-                "privacy" -> PrivacyScreen(onBack = { route = "home" })
-                "setup" -> SetupScreen(onBack = { route = "home" })
-                "settings" -> SettingsScreen(onBack = { route = "home" })
-                else -> OnboardingScreen(
-                    onChooseApps = { route = "apps" },
-                    onPrivacy = { route = "privacy" },
-                    onSetup = { route = "setup" },
-                    onSettings = { route = "settings" },
-                )
+            if (showApps) {
+                AppPickerScreen(onBack = { showApps = false })
+            } else {
+                Column(Modifier.fillMaxSize().background(c.pageBg)) {
+                    Box(Modifier.weight(1f)) {
+                        when (tab) {
+                            Tab.HOME -> OnboardingScreen(onChooseApps = { showApps = true })
+                            Tab.SETTINGS -> SettingsScreen()
+                            Tab.HELP -> HelpScreen()
+                        }
+                    }
+                    BottomBar(current = tab, c = c, onSelect = { tab = it })
+                }
             }
         }
         // In-app preview host: the chips render here directly (hardware-accelerated
@@ -117,14 +134,69 @@ private fun App() {
     }
 }
 
+@Composable
+private fun BottomBar(current: Tab, c: AppColors, onSelect: (Tab) -> Unit) {
+    Column(Modifier.fillMaxWidth().background(c.surface)) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.track))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TabItem("⌂", "Home", current == Tab.HOME, c) { onSelect(Tab.HOME) }
+            CenterTabItem(current == Tab.SETTINGS, c) { onSelect(Tab.SETTINGS) }
+            TabItem("?", "Help", current == Tab.HELP, c) { onSelect(Tab.HELP) }
+        }
+    }
+}
+
+@Composable
+private fun TabItem(glyph: String, label: String, selected: Boolean, c: AppColors, onClick: () -> Unit) {
+    val color = if (selected) c.accent else c.textSecondary
+    Column(
+        Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 22.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(glyph, color = color, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(3.dp))
+        Text(label, color = color, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+/** The center tab (Settings) is visually raised — a filled gear in a circle. */
+@Composable
+private fun CenterTabItem(selected: Boolean, c: AppColors, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier
+                .size(46.dp)
+                .clip(CircleShape)
+                .background(if (selected) c.accent else c.track),
+            contentAlignment = Alignment.Center,
+        ) {
+            // U+2699 + VS15 forces the monochrome (text) gear, not a colored emoji.
+            Text("⚙︎", color = if (selected) Color.White else c.textPrimary, fontSize = 22.sp)
+        }
+        Spacer(Modifier.height(2.dp))
+        Text("Settings", color = if (selected) c.accent else c.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun OnboardingScreen(
-    onChooseApps: () -> Unit,
-    onPrivacy: () -> Unit,
-    onSetup: () -> Unit,
-    onSettings: () -> Unit,
-) {
+private fun OnboardingScreen(onChooseApps: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val c = appColors()
@@ -166,18 +238,8 @@ private fun OnboardingScreen(
             Text(
                 "Turn your notifications into the island.",
                 color = c.textSecondary, fontSize = 14.sp,
-                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+                modifier = Modifier.padding(top = 4.dp, bottom = 20.dp),
             )
-            Spacer(Modifier.height(16.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                PillButton("🔒  What about privacy?", accent = true, onClick = onPrivacy)
-                PillButton("📖  How to set it up", onClick = onSetup)
-                PillButton("🎨  Customize the island", onClick = onSettings)
-            }
-            Spacer(Modifier.height(20.dp))
 
             PermissionRow(
                 step = "1",
@@ -261,8 +323,9 @@ private fun OnboardingScreen(
     }
 }
 
+/** The Help "?" tab: privacy/security concerns first, then how to set it up. */
 @Composable
-private fun PrivacyScreen(onBack: () -> Unit) {
+private fun HelpScreen() {
     val context = LocalContext.current
     val c = appColors()
     Box(
@@ -277,66 +340,109 @@ private fun PrivacyScreen(onBack: () -> Unit) {
                 .padding(24.dp)
                 .padding(top = 32.dp),
         ) {
-            BackLink(onBack)
-            Spacer(Modifier.height(16.dp))
-            Text("What about privacy?", color = c.textPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text("Help & FAQ", color = c.textPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
             Text(
-                "Sileo can read your notifications and draw over other apps. That's powerful, " +
-                    "so here's exactly what it does — and doesn't — do with that access.",
+                "Everything about Sileo — what it is, how to set it up, privacy, and how to turn it off.",
                 color = c.textBody, fontSize = 14.sp, lineHeight = 20.sp,
             )
             Spacer(Modifier.height(20.dp))
 
-            PrivacyPoint(
-                "Nothing leaves your phone",
-                "Sileo has no internet permission at all — no servers, no analytics, no tracking. " +
-                    "Your notifications are never uploaded or shared. They physically can't be.",
-            )
-            PrivacyPoint(
-                "Nothing is stored",
-                "Sileo keeps no history of your notifications. The only thing saved on-device is the " +
-                    "short list of apps you picked to show as islands.",
-            )
-            PrivacyPoint(
-                "Your content is never logged",
-                "Release builds never write notification titles or text to the device log, so OTPs, " +
-                    "messages and banking alerts stay private.",
-            )
-            PrivacyPoint(
-                "It can't see your taps",
-                "The island only redraws a notification you already received. It can't read what you " +
-                    "type, your passwords, or what's on screen underneath it.",
-            )
-            PrivacyPoint(
-                "You choose what's included",
-                "Only the apps you explicitly pick become islands. Everything else keeps stock Android " +
-                    "behavior, untouched.",
-            )
-            PrivacyPoint(
-                "Actions just open the app",
-                "Sileo is not a full notification replacement. Reply and action buttons don't work inline " +
-                    "like native notifications — tapping one simply opens the app it came from.",
-            )
-            PrivacyPoint(
-                "Open and inspectable",
-                "Sileo is a personal, open project — you can read exactly what it does with your notifications.",
-            )
+            // One section open at a time (accordion). Default: the intro.
+            var open by remember { mutableStateOf("what") }
+            fun toggle(k: String) { open = if (open == k) "" else k }
 
-            Spacer(Modifier.height(20.dp))
-            Text(
-                "In short: Sileo reads notifications only to redraw them as the island — on your phone, " +
-                    "for the apps you chose — and that information never goes anywhere else.",
-                color = c.textSecondary, fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium,
-            )
+            FaqItem("What is Sileo Island?", open == "what", { toggle("what") }) {
+                Text(
+                    "Sileo turns notifications from the apps you pick into a floating \"dynamic island\" at " +
+                        "the top of your screen — a gooey pill that expands to show the notification, then " +
+                        "tucks away. Every other app's notifications stay exactly as Android shows them.\n\n" +
+                        "It's a native re-creation of Sileo, the physics-based notification toast for the web " +
+                        "by Aaryan, rebuilt in Kotlin + Jetpack Compose as a real notification island.",
+                    color = c.textBody, fontSize = 13.5.sp, lineHeight = 20.sp,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+
+            FaqItem("How to set it up", open == "setup", { toggle("setup") }) {
+                SetupStep("1", "Allow notification access", "Enable Sileo Island in the notification-access list so it can read incoming notifications.")
+                SetupStep("2", "Allow display over other apps", "Lets Sileo draw the island on top of whatever you're using.")
+                SetupStep("3", "Choose your apps", "Pick which apps show as the island. Everything else stays the normal Android notification.")
+                Spacer(Modifier.height(4.dp))
+                Text("On Xiaomi / POCO / Redmi (MIUI / HyperOS)", color = c.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "MIUI needs a couple more toggles. In Settings → Apps → Sileo Island, also turn on " +
+                        "\"Display pop-up windows while running in the background\" and \"Autostart\", and set " +
+                        "battery to No restrictions. Then toggle Notification access off and back on.",
+                    color = c.textBody, fontSize = 13.5.sp, lineHeight = 19.sp,
+                )
+                Spacer(Modifier.height(12.dp))
+                Text("Using it", color = c.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Tap the gooey body to open the app it came from. Tap the pill to collapse it. Swipe up to dismiss.",
+                    color = c.textBody, fontSize = 13.5.sp, lineHeight = 19.sp,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+
+            FaqItem("What about privacy?", open == "privacy", { toggle("privacy") }) {
+                PrivacyPoint("Nothing leaves your phone", "Sileo has no internet permission at all — no servers, no analytics, no tracking. Your notifications are never uploaded or shared. They physically can't be.")
+                PrivacyPoint("Nothing is stored", "Sileo keeps no history of your notifications. The only thing saved on-device is the short list of apps you picked.")
+                PrivacyPoint("Your content is never logged", "Release builds never write notification titles or text to the device log, so OTPs, messages and banking alerts stay private.")
+                PrivacyPoint("It can't see your taps", "The island only redraws a notification you already received. It can't read what you type, your passwords, or what's on screen underneath it.")
+                PrivacyPoint("You choose what's included", "Only the apps you explicitly pick become islands. Everything else keeps stock Android behavior.")
+            }
+            Spacer(Modifier.height(10.dp))
+
+            FaqItem("Does closing the app stop notifications?", open == "closing", { toggle("closing") }) {
+                Text(
+                    "No. Sileo's notification listener runs in the background on its own — it stays active as " +
+                        "long as \"Notification access\" is granted, even after you swipe the app away from " +
+                        "Recents. You don't need to keep the app open; it's only the setup screen.\n\n" +
+                        "On Xiaomi / POCO / Redmi (MIUI / HyperOS) the system may aggressively kill background " +
+                        "apps. If islands stop appearing, enable Autostart and set battery to \"No restrictions\" " +
+                        "for Sileo, then toggle Notification access off and back on.",
+                    color = c.textBody, fontSize = 13.5.sp, lineHeight = 20.sp,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+
+            FaqItem("How to disable Sileo completely", open == "disable", { toggle("disable") }) {
+                Text(
+                    "To fully stop Sileo, undo the access you granted. Turning off Notification access alone " +
+                        "disables it — the rest is cleanup.",
+                    color = c.textBody, fontSize = 13.5.sp, lineHeight = 20.sp,
+                )
+                Spacer(Modifier.height(12.dp))
+                SettingsActionButton("1.  Turn off Notification access") { openListenerSettings(context) }
+                Spacer(Modifier.height(8.dp))
+                SettingsActionButton("2.  Turn off Display over other apps") { openOverlaySettings(context) }
+                Spacer(Modifier.height(8.dp))
+                SettingsActionButton("3.  App info — battery, autostart, uninstall") { openAppInfo(context) }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "On MIUI, also disable Autostart and \"Display pop-up windows…\" from App info — you can " +
+                        "uninstall from there too.",
+                    color = c.textSecondary, fontSize = 12.5.sp, lineHeight = 18.sp,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+
+            FaqItem("Replies & actions", open == "actions", { toggle("actions") }) {
+                Text(
+                    "Sileo isn't a full notification replacement. Reply and action buttons don't work inline " +
+                        "like native notifications — tapping one simply opens the app it came from.",
+                    color = c.textBody, fontSize = 13.5.sp, lineHeight = 20.sp,
+                )
+            }
 
             Spacer(Modifier.height(28.dp))
             Text("About", color = c.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
             Text(
-                "Sileo for Android is built on top of Sileo — the original physics-based \"Dynamic " +
-                    "Island\" toast for the web by Aaryan. This is an independent native re-creation in " +
-                    "Kotlin + Jetpack Compose, turned into a real notification island.",
+                "Sileo for Android is an independent, open-source project built on top of Sileo (web) by Aaryan.",
                 color = c.textBody, fontSize = 13.5.sp, lineHeight = 19.sp,
             )
             Spacer(Modifier.height(12.dp))
@@ -347,6 +453,58 @@ private fun PrivacyScreen(onBack: () -> Unit) {
             LinkText("Report a bug / feedback  ↗") { openUrl(context, ISSUES_URL) }
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+/** A collapsible FAQ card: tap the header to expand/collapse its body. */
+@Composable
+private fun FaqItem(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val c = appColors()
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(c.surface),
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Spacer(Modifier.size(10.dp))
+            Text(if (expanded) "–" else "+", color = c.textSecondary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        }
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) { content() }
+        }
+    }
+}
+
+/** A full-width outlined button that deep-links into a system settings screen. */
+@Composable
+private fun SettingsActionButton(label: String, onClick: () -> Unit) {
+    val c = appColors()
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, c.track, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp, horizontal = 14.dp),
+    ) {
+        Text(label, color = c.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -361,79 +519,6 @@ private fun PrivacyPoint(title: String, body: String) {
         Text(title, color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(3.dp))
         Text(body, color = c.textBody, fontSize = 13.5.sp, lineHeight = 19.sp)
-    }
-}
-
-@Composable
-private fun SetupScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
-    val c = appColors()
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(c.pageBg),
-    ) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp)
-                .padding(top = 32.dp),
-        ) {
-            BackLink(onBack)
-            Spacer(Modifier.height(16.dp))
-            Text("How to set it up", color = c.textPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "Three quick steps to turn your notifications into the island.",
-                color = c.textBody, fontSize = 14.sp, lineHeight = 20.sp,
-            )
-            Spacer(Modifier.height(20.dp))
-
-            SetupStep(
-                "1", "Allow notification access",
-                "Opens the notification-access list — enable Sileo Island so it can read incoming notifications.",
-            )
-            SetupStep(
-                "2", "Allow display over other apps",
-                "Lets Sileo draw the island on top of whatever you're using.",
-            )
-            SetupStep(
-                "3", "Choose your apps",
-                "Pick which apps show as the island. Everything else stays the normal Android notification.",
-            )
-
-            Spacer(Modifier.height(8.dp))
-            Text("On Xiaomi / POCO / Redmi (MIUI / HyperOS)", color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "MIUI needs a couple more toggles. In Settings → Apps → Sileo Island, also turn on " +
-                    "\"Display pop-up windows while running in the background\" and \"Autostart\", and set " +
-                    "battery to No restrictions. Then toggle Notification access off and back on.",
-                color = c.textBody, fontSize = 13.5.sp, lineHeight = 19.sp,
-            )
-
-            Spacer(Modifier.height(18.dp))
-            Text("Using it", color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Tap the gooey body to open the app it came from. Tap the pill to collapse it. Swipe up to dismiss.",
-                color = c.textBody, fontSize = 13.5.sp, lineHeight = 19.sp,
-            )
-
-            Spacer(Modifier.height(18.dp))
-            Text("Heads up: replies & actions", color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Sileo isn't a full notification replacement. Reply and action buttons don't work inline like " +
-                    "native notifications — tapping one just opens the respective app.",
-                color = c.textBody, fontSize = 13.5.sp, lineHeight = 19.sp,
-            )
-
-            Spacer(Modifier.height(18.dp))
-            LinkText("Full guide & source on GitHub  ↗") { openUrl(context, REPO_URL) }
-            Spacer(Modifier.height(24.dp))
-        }
     }
 }
 
@@ -464,24 +549,6 @@ private fun SetupStep(num: String, title: String, body: String) {
 }
 
 @Composable
-private fun PillButton(label: String, accent: Boolean = false, onClick: () -> Unit) {
-    val c = appColors()
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(50))
-            .background(if (accent) c.accent else c.surface)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 11.dp),
-    ) {
-        Text(
-            label,
-            color = if (accent) Color.White else c.textPrimary,
-            fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
-@Composable
 private fun LinkText(label: String, onClick: () -> Unit) {
     val c = appColors()
     Text(
@@ -491,19 +558,6 @@ private fun LinkText(label: String, onClick: () -> Unit) {
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
             .padding(vertical = 4.dp, horizontal = 2.dp),
-    )
-}
-
-@Composable
-private fun BackLink(onBack: () -> Unit) {
-    val c = appColors()
-    Text(
-        "‹ Back",
-        color = c.accent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onBack)
-            .padding(vertical = 6.dp, horizontal = 2.dp),
     )
 }
 
@@ -612,6 +666,28 @@ private fun Chip(label: String, onClick: () -> Unit) {
 
 private fun openUrl(ctx: Context, url: String) {
     runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+}
+
+// --- "Disable Sileo" deep-links into the relevant system settings screens ---
+
+private fun openListenerSettings(ctx: Context) {
+    runCatching { ctx.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+}
+
+private fun openOverlaySettings(ctx: Context) {
+    runCatching {
+        ctx.startActivity(
+            Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${ctx.packageName}")),
+        )
+    }
+}
+
+private fun openAppInfo(ctx: Context) {
+    runCatching {
+        ctx.startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")),
+        )
+    }
 }
 
 private fun isListenerEnabled(ctx: Context): Boolean {

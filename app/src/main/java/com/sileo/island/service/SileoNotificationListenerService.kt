@@ -200,11 +200,14 @@ class SileoNotificationListenerService : NotificationListenerService() {
         overlayView = view
 
         val params = WindowManager.LayoutParams(
-            // WRAP_CONTENT so the window hugs the island at top-center: it's touchable
-            // (so taps/swipes reach the island) but covers nothing else, so the rest of
-            // the screen still passes through to the app underneath. When no island is
-            // showing the content is ~empty, so the window shrinks to nothing.
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            // MATCH_PARENT width so the window never repositions horizontally as the
+            // island's width changes (expand→collapse). A WRAP_CONTENT width window
+            // re-centers itself every frame, which on some launchers/MIUI glitches and
+            // leaves the island stuck drifted to the side. The island centers itself in
+            // Compose instead. Height is WRAP_CONTENT so the window is only a top strip
+            // (as tall as the island), leaving the rest of the screen pass-through; when
+            // no island is showing the content is empty, so the strip shrinks to nothing.
+            WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             // NOT_FOCUSABLE: don't steal the keyboard / back button. We intentionally do
